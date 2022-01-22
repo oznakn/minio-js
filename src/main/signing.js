@@ -32,7 +32,7 @@ const signV4Algorithm = 'AWS4-HMAC-SHA256'
 //  <SignedHeaders>\n
 //  <HashedPayload>
 //
-function getCanonicalRequest(method, path, headers, signedHeaders, hashedPayload) {
+function getCanonicalRequest(method, path, headers, signedHeaders, hashedPayload, signingHost) {
   if (!isString(method)) {
     throw new TypeError('method should be of type "string"')
   }
@@ -51,7 +51,11 @@ function getCanonicalRequest(method, path, headers, signedHeaders, hashedPayload
   var headersArray = signedHeaders.reduce((acc, i) => {
     // Trim spaces from the value (required by V4 spec)
     var val = `${headers[i]}`.replace(/ +/g, " ")
-    acc.push(`${i.toLowerCase()}:${val}`)
+    if (i.toLowerCase() === 'host' && signingHost) {
+      acc.push(`${i.toLowerCase()}:${signingHost}`)
+    } else {
+      acc.push(`${i.toLowerCase()}:${val}`)
+    }
     return acc
   }, [])
 
@@ -187,7 +191,7 @@ export function postPresignSignatureV4(region, date, secretKey, policyBase64) {
 }
 
 // Returns the authorization header
-export function signV4(request, accessKey, secretKey, region, requestDate) {
+export function signV4(request, accessKey, secretKey, region, requestDate, signingHost) {
   if (!isObject(request)) {
     throw new TypeError('request should be of type "object"')
   }
@@ -212,7 +216,7 @@ export function signV4(request, accessKey, secretKey, region, requestDate) {
 
   var signedHeaders = getSignedHeaders(request.headers)
   var canonicalRequest = getCanonicalRequest(request.method, request.path, request.headers,
-                                             signedHeaders, sha256sum)
+                                             signedHeaders, sha256sum, signingHost)
   var stringToSign = getStringToSign(canonicalRequest, requestDate, region)
   var signingKey = getSigningKey(requestDate, region, secretKey)
   var credential = getCredential(accessKey, region, requestDate)
@@ -222,7 +226,7 @@ export function signV4(request, accessKey, secretKey, region, requestDate) {
 }
 
 // returns a presigned URL string
-export function presignSignatureV4(request, accessKey, secretKey, sessionToken, region, requestDate, expires) {
+export function presignSignatureV4(request, accessKey, secretKey, sessionToken, region, requestDate, expires, signingHost) {
   if (!isObject(request)) {
     throw new TypeError('request should be of type "object"')
   }
@@ -279,7 +283,7 @@ export function presignSignatureV4(request, accessKey, secretKey, sessionToken, 
   var path = resource + '?' + query
 
   var canonicalRequest = getCanonicalRequest(request.method, path,
-                                             request.headers, signedHeaders, hashedPayload)
+                                             request.headers, signedHeaders, hashedPayload, signingHost)
 
   var stringToSign = getStringToSign(canonicalRequest, requestDate, region)
   var signingKey = getSigningKey(requestDate, region, secretKey)

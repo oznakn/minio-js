@@ -121,6 +121,11 @@ export class Client {
     var libraryAgent = `MinIO ${libraryComments} minio-js/${Package.version}`
     // User agent block ends.
 
+    var signingHost
+    if (params.signingHost) {
+      signingHost = params.signingHost
+    }
+
     this.transport = transport
     this.host = host
     this.port = port
@@ -129,6 +134,7 @@ export class Client {
     this.secretKey = params.secretKey
     this.sessionToken = params.sessionToken
     this.userAgent = `${libraryAgent}`
+    this.signingHost = signingHost
 
     // Default path style is true
     if (params.pathStyle === undefined) {
@@ -217,6 +223,10 @@ export class Client {
     var virtualHostStyle
     if (bucketName) {
       virtualHostStyle = isVirtualHostStyle(this.host, this.protocol, bucketName, this.pathStyle)
+    }
+
+    if (this.signingHost) {
+      virtualHostStyle = true
     }
 
     if (this.port) reqOptions.port = this.port
@@ -458,7 +468,7 @@ export class Client {
           reqOptions.headers['x-amz-security-token'] = this.sessionToken
         }
 
-        var authorization = signV4(reqOptions, this.accessKey, this.secretKey, region, date)
+        var authorization = signV4(reqOptions, this.accessKey, this.secretKey, region, date, this.signingHost)
         reqOptions.headers.authorization = authorization
       }
       var req = this.transport.request(reqOptions, response => {
@@ -1847,7 +1857,7 @@ export class Client {
                                                query})
       try {
         url = presignSignatureV4(reqOptions, this.accessKey, this.secretKey,
-                                 this.sessionToken, region, requestDate, expires)
+                                 this.sessionToken, region, requestDate, expires, this.signingHost)
       } catch (pe) {
         return cb(pe)
       }
